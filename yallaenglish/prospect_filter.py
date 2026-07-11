@@ -9,6 +9,7 @@ only contains public, active, reasonably-sized accounts.
 Hard checks (defaults, all configurable via CLI flags):
   - account must be PUBLIC            (private accounts are useless for outreach)
   - followers >= 10,000
+  - followers <= 1,000,000            (mega accounts / big brands never collab)
   - posts >= 12                       (weeds out empty/parked accounts)
   - followers/following ratio >= 1.0  (weeds out follow-for-follow spam)
   - engagement rate >= 1.0%           (only when the data is available)
@@ -212,8 +213,9 @@ def main():
     parser = argparse.ArgumentParser(description="Screen YallaEnglish Instagram prospects.")
     parser.add_argument("input", type=Path, help="prospects file (.json or .csv)")
     parser.add_argument("--min-followers", type=int, default=10_000)
-    parser.add_argument("--max-followers", type=int, default=None,
-                        help="optional cap, e.g. 500000 to skip mega accounts that never reply")
+    parser.add_argument("--max-followers", type=int, default=1_000_000,
+                        help="upper cap — mega accounts and big brands (BBC etc.) never collab "
+                             "with small brands; pass 0 to disable")
     parser.add_argument("--min-posts", type=int, default=12)
     parser.add_argument("--min-ratio", type=float, default=1.0,
                         help="minimum followers/following ratio")

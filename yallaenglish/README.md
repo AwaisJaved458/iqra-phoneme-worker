@@ -9,6 +9,7 @@ Telegram without passing through `prospect_filter.py` first.**
 |---|---|---|
 | Account visibility | must be **public** | reject — scraper must provide it |
 | Followers | **≥ 10,000** | reject — scraper must provide it |
+| Follower cap | **≤ 1,000,000** — mega accounts / big brands (BBC etc.) never collab with small brands; `--max-followers 0` disables | reject — scraper must provide it |
 | Posts | ≥ 12 | skipped |
 | Followers/following ratio | ≥ 1.0 (filters follow-for-follow spam) | skipped |
 | Engagement rate | ≥ 1.0% | skipped |
