@@ -5,3 +5,4 @@ __pycache__/
 # The index of media URLs + local paths + body text lives in
 # output/countertop_ads_media.csv, which IS tracked.
 output/media/
+output/*.zip
