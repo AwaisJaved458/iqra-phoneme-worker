@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """YallaEnglish prospect screening filter.
 
-Takes a raw list of Instagram prospect accounts (JSON or CSV) and applies a
+Takes a raw list of Instagram/TikTok prospect accounts (JSON or CSV — set
+"platform": "tiktok" per row, default is instagram) and applies a
 minimum quality bar before anything is sent to Telegram. Accounts that fail
 any hard check are rejected with the reason recorded, so the outreach list
 only contains public, active, reasonably-sized accounts.
@@ -39,6 +40,7 @@ from pathlib import Path
 
 # Scrapers name the same fields differently; normalise the common aliases.
 FIELD_ALIASES = {
+    "platform": ["platform", "network", "site"],
     "username": ["username", "handle", "user_name", "account", "ig_username"],
     "full_name": ["full_name", "name", "fullName"],
     "followers": ["followers", "follower_count", "followers_count", "followersCount", "edge_followed_by"],
@@ -139,7 +141,15 @@ def normalize(raw):
         if interactions:
             prospect["engagement_rate"] = round(interactions / prospect["followers"] * 100, 2)
     prospect["days_since_post"] = _days_since(prospect["last_post_date"])
+    prospect["platform"] = (prospect["platform"] or "instagram").strip().lower()
     return prospect
+
+
+def profile_url(prospect):
+    username = prospect["username"].lstrip("@")
+    if prospect["platform"] == "tiktok":
+        return f"https://tiktok.com/@{username}"
+    return f"https://instagram.com/{username}"
 
 
 def screen(prospect, args):
@@ -204,8 +214,8 @@ def telegram_digest(passed):
             bits.append(f"{p['engagement_rate']}% engagement")
         if p["posts"] is not None:
             bits.append(f"{p['posts']} posts")
-        lines.append(f"{i}. @{p['username']} — {', '.join(bits)}")
-        lines.append(f"   https://instagram.com/{p['username']}")
+        lines.append(f"{i}. @{p['username']} ({p['platform']}) — {', '.join(bits)}")
+        lines.append(f"   {profile_url(p)}")
     return "\n".join(lines)
 
 

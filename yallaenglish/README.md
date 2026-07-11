@@ -1,7 +1,9 @@
 # YallaEnglish prospect screening
 
-Minimum quality bar for Instagram prospects. **No prospect list gets sent to
-Telegram without passing through `prospect_filter.py` first.**
+Minimum quality bar for Instagram **and TikTok** prospects. **No prospect list
+gets sent to Telegram without passing through `prospect_filter.py` first.**
+Each row may set `"platform": "instagram" | "tiktok"` (default instagram) —
+the same thresholds apply to both, and digest links point at the right site.
 
 ## The bar (defaults)
 
