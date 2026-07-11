@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "facebook-ads": {
-      "command": "/opt/fbads-venv/bin/python",
-      "args": ["fb-ads-scraper/facebook_ads_mcp.py"],
+      "command": "bash",
+      "args": [
+        "-c",
+        "V=\"$HOME/.fbads-venv\"; if [ ! -x \"$V/bin/python\" ]; then python3 -m venv \"$V\" && \"$V/bin/pip\" install -q --upgrade pip && \"$V/bin/pip\" install -q fastmcp requests beautifulsoup4 1>&2; fi; exec \"$V/bin/python\" fb-ads-scraper/facebook_ads_mcp.py"
+      ],
       "env": {
         "FACEBOOK_ACCESS_TOKEN": "${FACEBOOK_ACCESS_TOKEN}"
       }
