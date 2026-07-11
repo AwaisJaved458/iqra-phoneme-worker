@@ -24,10 +24,13 @@ forced to supply it.
 Usage:
     python prospect_filter.py prospects.json
     python prospect_filter.py prospects.csv --min-followers 25000 --telegram
+    python prospect_filter.py prospects.json --ledger sent_ledger.json --take 50 --cards
 
 Outputs passed.json / rejected.json next to the input file (override with
---out-dir) and prints a summary. --telegram additionally prints a
-ready-to-paste digest of the accepted accounts.
+--out-dir) and prints a summary. --telegram prints a ready-to-paste digest;
+--cards prints one DM-ready card per account. --ledger excludes handles
+already sent in previous digests and appends the newly taken ones, so daily
+runs never repeat an account; --take caps how many are taken per run.
 """
 
 import argparse
@@ -35,7 +38,7 @@ import csv
 import json
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 # Scrapers name the same fields differently; normalise the common aliases.
@@ -205,6 +208,28 @@ def load_prospects(path):
     return data
 
 
+def _fmt_count(n):
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M".replace(".0M", "M")
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k".replace(".0k", "k")
+    return str(n)
+
+
+def cards(taken):
+    blocks = []
+    for i, p in enumerate(taken, 1):
+        bits = [f"{_fmt_count(p['followers'])} followers"]
+        if p["engagement_rate"] is not None:
+            bits.append(f"{p['engagement_rate']}% engagement")
+        lines = [f"{i}) @{p['username']} · {p['platform']} · {' · '.join(bits)}"]
+        if p["bio"]:
+            lines.append(f"   {p['bio']}")
+        lines.append(f"   {profile_url(p)}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
 def telegram_digest(passed):
     lines = ["YallaEnglish prospects — screened, all public & above the minimum bar:", ""]
     ranked = sorted(passed, key=lambda p: (p["engagement_rate"] or 0, p["followers"] or 0), reverse=True)
@@ -238,28 +263,73 @@ def main():
                         help="where to write passed.json / rejected.json (default: next to input)")
     parser.add_argument("--telegram", action="store_true",
                         help="print a ready-to-send Telegram digest of the accepted accounts")
+    parser.add_argument("--cards", action="store_true",
+                        help="print one DM-ready card per taken account")
+    parser.add_argument("--ledger", type=Path, default=None,
+                        help="JSON ledger of already-sent handles — excludes them, then appends the taken accounts")
+    parser.add_argument("--take", type=int, default=0,
+                        help="cap this run to the top N accounts after ranking (0 = all)")
     args = parser.parse_args()
 
-    verdicts = [screen(normalize(raw), args) for raw in load_prospects(args.input)]
+    ledger_entries = []
+    already_sent = set()
+    if args.ledger and args.ledger.exists():
+        ledger_entries = json.loads(args.ledger.read_text(encoding="utf-8"))
+        already_sent = {(e["platform"], e["username"].lower()) for e in ledger_entries}
+
+    verdicts = []
+    ledger_skips = 0
+    for raw in load_prospects(args.input):
+        prospect = normalize(raw)
+        verdict = screen(prospect, args)
+        if prospect["username"] and (prospect["platform"], prospect["username"].lower()) in already_sent:
+            verdict.reasons.append("already sent in a previous digest (ledger)")
+            ledger_skips += 1
+        verdicts.append(verdict)
+
     passed = [v.prospect for v in verdicts if v.passed]
     rejected = [{**v.prospect, "rejected_because": v.reasons} for v in verdicts if not v.passed]
+    ranked = sorted(passed, key=lambda p: (p["engagement_rate"] or 0, p["followers"] or 0), reverse=True)
+    taken = ranked[: args.take] if args.take else ranked
 
     out_dir = args.out_dir or args.input.parent
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "passed.json").write_text(json.dumps(passed, indent=2, ensure_ascii=False), encoding="utf-8")
     (out_dir / "rejected.json").write_text(json.dumps(rejected, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print(f"Screened {len(verdicts)} prospects: {len(passed)} passed, {len(rejected)} rejected.")
+    summary = f"Screened {len(verdicts)} prospects: {len(passed)} passed, {len(rejected)} rejected"
+    if ledger_skips:
+        summary += f" ({ledger_skips} skipped as already sent)"
+    if args.take:
+        summary += f"; taking top {len(taken)} of {len(passed)}"
+    print(summary + ".")
     for entry in rejected:
         print(f"  ✗ @{entry.get('username') or '<no username>'}: {'; '.join(entry['rejected_because'])}")
     print(f"\nWrote {out_dir / 'passed.json'} and {out_dir / 'rejected.json'}")
 
+    if args.ledger and taken:
+        today = date.today().isoformat()
+        ledger_entries.extend(
+            {"username": p["username"], "platform": p["platform"], "sent_on": today} for p in taken
+        )
+        args.ledger.write_text(
+            json.dumps(ledger_entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        print(f"Appended {len(taken)} accounts to {args.ledger} ({len(ledger_entries)} total sent).")
+
     if args.telegram:
-        if passed:
+        if taken:
             print("\n--- Telegram digest ---\n")
-            print(telegram_digest(passed))
+            print(telegram_digest(taken))
         else:
             print("\nNothing passed the bar — nothing to send.")
+
+    if args.cards:
+        if taken:
+            print(f"\n--- Cards ({len(taken)}) ---\n")
+            print(cards(taken))
+        else:
+            print("\nNothing passed the bar — no cards.")
     return 0
 
 
