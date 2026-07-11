@@ -1,0 +1,254 @@
+{
+  "advertisers": [
+    {
+      "advertiser": "RS Custom Countertops",
+      "page_id": "1582026298728590",
+      "US": {
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "AI-7CicgPnvpq_uae3JJKj8",
+          "http_status": 400
+        }
+      },
+      "EU": {
+        "country": "NL",
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "AEmSNfMpxUMs2HpRqxrQZE4",
+          "http_status": 400
+        }
+      }
+    },
+    {
+      "advertiser": "Pacific Stone SoCal",
+      "page_id": "471114526327906",
+      "US": {
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "AGQAkXRUBm-HUXnOLMoPQ-j",
+          "http_status": 400
+        }
+      },
+      "EU": {
+        "country": "NL",
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "A-Ys14su2wgkcY8_5_qoRrH",
+          "http_status": 400
+        }
+      }
+    },
+    {
+      "advertiser": "Stone Masters, Inc.",
+      "page_id": "175590904720",
+      "US": {
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "Amljfy1AwlKWJR9GnxmZ-m4",
+          "http_status": 400
+        }
+      },
+      "EU": {
+        "country": "NL",
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "A2U2bLiWrsJVBrWitu5LKAk",
+          "http_status": 400
+        }
+      }
+    },
+    {
+      "advertiser": "Sk Stones USA",
+      "page_id": "172343479474457",
+      "US": {
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "AircHypP3uGkNihFWjv2St8",
+          "http_status": 400
+        }
+      },
+      "EU": {
+        "country": "NL",
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "AoVxsYwrQ9g836z-r4WT-Kc",
+          "http_status": 400
+        }
+      }
+    },
+    {
+      "advertiser": "Spencer Granite Co",
+      "page_id": "1881955151887046",
+      "US": {
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "AcK-8BadeoA2AKf8KW2Asqn",
+          "http_status": 400
+        }
+      },
+      "EU": {
+        "country": "NL",
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "A4XUPqnrTLK6aqfxxETqQIp",
+          "http_status": 400
+        }
+      }
+    },
+    {
+      "advertiser": "ART STONE Surfaces (Atlanta)",
+      "page_id": "116918619388",
+      "US": {
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "ATcPse_DIFR6pwdmYsrVD-l",
+          "http_status": 400
+        }
+      },
+      "EU": {
+        "country": "NL",
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "A6hK1krNJbLsCbzqUpdkDj4",
+          "http_status": 400
+        }
+      }
+    },
+    {
+      "advertiser": "Stone Elegance Quartz",
+      "page_id": "151841294689427",
+      "US": {
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "A1zT6MAp9crZOccJ1wrlRXT",
+          "http_status": 400
+        }
+      },
+      "EU": {
+        "country": "NL",
+        "ads": 0,
+        "with_body": 0,
+        "error": {
+          "message": "Application does not have permission for this action",
+          "type": "OAuthException",
+          "code": 10,
+          "error_subcode": 2332002,
+          "is_transient": false,
+          "error_user_title": "Authorization and login needed",
+          "error_user_msg": "To access the API, you'll need to follow the steps at facebook.com/ads/library/api.",
+          "fbtrace_id": "An4eEbYzIq1cTS0SfRCUeTE",
+          "http_status": 400
+        }
+      }
+    }
+  ],
+  "totals": {
+    "ads": 0,
+    "with_body": 0,
+    "empty_body": 0
+  }
+}
