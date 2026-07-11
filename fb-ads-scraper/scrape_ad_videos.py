@@ -1,46 +1,40 @@
 #!/usr/bin/env python3
-"""Download the video/image creatives for the 124 countertop ads.
+"""Download the video/image creatives + body text for the countertop ads.
 
-Meta's ads_archive API has NO video field. The actual media URLs
-(video_hd_url / video_sd_url / original_image_url on *.fbcdn.net) are embedded
-as JSON inside each ad's public snapshot page on www.facebook.com. This script
-fetches each snapshot page, extracts those URLs (plus the ad's primary body
-text, which the API also withholds for US ads), and downloads the media.
+Meta's ads_archive API has NO video field and withholds body text for
+US-reached ads. Both live in each ad's public snapshot page
+(www.facebook.com/ads/library/?id=<ad_id>) as embedded JSON. This script
+fetches each page, solves Meta's request-deflection challenge, extracts the
+media URLs + primary body text scoped to that ad's snapshot object, and
+downloads the creatives from *.fbcdn.net.
 
-NETWORK REQUIREMENT
--------------------
-This environment's egress policy currently allows only graph.facebook.com.
-Both www.facebook.com and *.fbcdn.net are DENIED (proxy CONNECT 403), so this
-script cannot run here until the session's network policy allows:
+How the fetch works (verified live 2026-07-11):
+  1. First hit returns HTTP 403 with a tiny JS "challenge" that just POSTs to
+     /__rd_verify_<token>?challenge=N and reloads. We replay that POST
+     directly; it sets an `rd_challenge` cookie valid for the whole session.
+  2. The page then serves ~700-900 KB of HTML which embeds the ad's snapshot
+     JSON: videos[].video_hd_url / video_sd_url, images[].original_image_url,
+     body.text, plus extra_videos/extra_images/cards for carousels.
+  3. IMPORTANT: the page also embeds a feed of UNRELATED ads, so extraction is
+     scoped by brace-matching the "snapshot" object that follows OUR
+     "ad_archive_id" — never regex the whole page.
+  4. Full Chrome header set (Sec-Fetch-*, Sec-Ch-Ua) is required; without it
+     Facebook answers 400.
 
-    www.facebook.com   (snapshot pages)
-    web.facebook.com   (redirect host)
-    *.fbcdn.net        (video/image CDN, e.g. video-xxx.fbcdn.net, scontent-xxx.fbcdn.net)
-
-Change it at claude.ai/code -> your environment -> network policy, or run this
-script on any normal machine (it has no sandbox-specific dependencies):
-
-    pip install requests
-    python fb-ads-scraper/scrape_ad_videos.py
-
-Notes on reliability: Ad Library snapshot pages are public (no login), but
-Facebook rate-limits and sometimes interstitials automated traffic. The script
-uses a browser User-Agent, polite delays, and retries; anything it still can't
-fetch is recorded in the output CSV as an error instead of crashing. If plain
-HTTP fetches come back empty, install Playwright and re-run with --render to
-fully render pages in Chromium (in this sandbox: executablePath
-/opt/pw-browsers/chromium is preinstalled).
+Network requirements: www.facebook.com and *.fbcdn.net must be reachable
+(this session's egress policy was updated to allow them; graph.facebook.com
+alone is not enough).
 
 Usage:
     python scrape_ad_videos.py                 # all ads from the full CSV
-    python scrape_ad_videos.py --limit 5       # first 5 (smoke test)
+    python scrape_ad_videos.py --limit 5       # smoke test
     python scrape_ad_videos.py --ids 994840666762380,1911986836153287
-    python scrape_ad_videos.py --no-download   # extract URLs only, skip mp4/jpg downloads
-    python scrape_ad_videos.py --render        # use Playwright/Chromium rendering
+    python scrape_ad_videos.py --no-download   # extract URLs/body only
+    python scrape_ad_videos.py --max-videos 3  # cap videos downloaded per ad
 
 Outputs:
     output/media/<page_id>/<ad_id>/*.mp4|*.jpg   downloaded creatives
-    output/countertop_ads_media.csv              one row per ad: media URLs, body text, local paths, status
+    output/countertop_ads_media.csv              per-ad: media urls, body text, local paths, status
 """
 import argparse
 import csv
@@ -63,91 +57,121 @@ HEADERS = {
     "User-Agent": UA,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Ch-Ua": '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
 }
 
-# Media + body text live in embedded JSON on the snapshot page. Escaped JSON
-# string bodies are captured intact and decoded with json.loads afterwards.
-JSON_STR = r'"((?:[^"\\]|\\.)*)"'
-PATTERNS = {
-    "video_hd": re.compile(r'"video_hd_url"\s*:\s*' + JSON_STR),
-    "video_sd": re.compile(r'"video_sd_url"\s*:\s*' + JSON_STR),
-    "video_preview_img": re.compile(r'"video_preview_image_url"\s*:\s*' + JSON_STR),
-    "image_original": re.compile(r'"original_image_url"\s*:\s*' + JSON_STR),
-    "image_resized": re.compile(r'"resized_image_url"\s*:\s*' + JSON_STR),
-}
-BODY_PATTERNS = [
-    re.compile(r'"body"\s*:\s*\{\s*"text"\s*:\s*' + JSON_STR),
-    re.compile(r'"body"\s*:\s*\{\s*"markup"\s*:\s*\{\s*"__html"\s*:\s*' + JSON_STR),
-]
 
-
-def decode_json_str(raw):
-    """Decode a raw escaped JSON string body ('https:\\/\\/...') to text."""
-    try:
-        return json.loads('"' + raw + '"')
-    except ValueError:
-        return raw.replace("\\/", "/")
-
-
-def fetch_html(session, url, retries=3, sleep=2.0):
-    last_err = None
+def get_page(session, url, retries=3):
+    """GET a snapshot page, solving the __rd_verify challenge when served."""
+    last = None
     for attempt in range(retries):
         try:
-            resp = session.get(url, headers=HEADERS, timeout=45)
-            if resp.status_code == 200 and resp.text:
-                return resp.text, None
-            last_err = "HTTP {}".format(resp.status_code)
+            r = session.get(url, headers=HEADERS, timeout=45)
         except requests.exceptions.RequestException as exc:
-            last_err = str(exc)[:200]
-        time.sleep(sleep * (attempt + 1))
-    return None, last_err
+            last = str(exc)[:200]
+            time.sleep(2 * (attempt + 1))
+            continue
+        if r.status_code == 403 and "executeChallenge" in r.text:
+            m = re.search(r"fetch\('([^']+)'", r.text)
+            if m:
+                try:
+                    session.post("https://www.facebook.com" + m.group(1),
+                                 headers=HEADERS, timeout=30)
+                except requests.exceptions.RequestException:
+                    pass
+                continue  # reload on next loop iteration
+        if r.status_code == 200 and len(r.text) > 10000:
+            return r.text, None
+        last = "HTTP {} ({} bytes)".format(r.status_code, len(r.text))
+        time.sleep(2 * (attempt + 1))
+    return None, last
 
 
-def render_html(url):
-    """Optional Playwright path for JS-walled pages (--render)."""
-    from playwright.sync_api import sync_playwright  # imported lazily on purpose
-    exe = os.environ.get("CCR_CHROMIUM", "/opt/pw-browsers/chromium")
-    with sync_playwright() as pw:
-        kwargs = {"headless": True}
-        if os.path.exists(exe):
-            kwargs["executable_path"] = exe
-        browser = pw.chromium.launch(**kwargs)
+def brace_match(text, start):
+    """Return the balanced JSON object substring starting at text[start]=='{'."""
+    depth, i, in_str, esc = 0, start, False, False
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        else:
+            if c == '"':
+                in_str = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start:i + 1]
+        i += 1
+    return None
+
+
+def extract_for_ad(html, ad_id):
+    """Media + body scoped to THIS ad's snapshot (the page embeds other ads too)."""
+    out = {"videos_hd": [], "videos_sd": [], "images": [], "preview_imgs": [], "body": ""}
+    for m in re.finditer(r'"ad_archive_id"\s*:\s*"?' + re.escape(ad_id) + r'"?', html):
+        snap = html.find('"snapshot"', m.end())
+        if snap == -1 or snap - m.end() > 5000:
+            continue
+        obr = html.find("{", snap)
+        blob = brace_match(html, obr) if obr != -1 else None
+        if not blob:
+            continue
         try:
-            page = browser.new_page(user_agent=UA)
-            page.goto(url, wait_until="networkidle", timeout=60000)
-            return page.content(), None
-        finally:
-            browser.close()
-
-
-def extract_media(html):
-    """Pull media URLs + body text out of the snapshot page HTML."""
-    found = {}
-    for key, pat in PATTERNS.items():
-        urls = []
-        for m in pat.findall(html):
-            u = decode_json_str(m)
-            if u.startswith("http") and u not in urls:
-                urls.append(u)
-        found[key] = urls
-    body = ""
-    for pat in BODY_PATTERNS:
-        m = pat.search(html)
-        if m:
-            body = decode_json_str(m.group(1))
-            body = re.sub(r"<[^>]+>", " ", body)          # markup variant -> plain text
-            body = re.sub(r"\s+", " ", body).strip()
-            if body:
-                break
-    return found, body
+            data = json.loads(blob)
+        except ValueError:
+            continue
+        for v in (data.get("videos") or []) + (data.get("extra_videos") or []):
+            if v.get("video_hd_url"):
+                out["videos_hd"].append(v["video_hd_url"])
+            if v.get("video_sd_url"):
+                out["videos_sd"].append(v["video_sd_url"])
+            if v.get("video_preview_image_url"):
+                out["preview_imgs"].append(v["video_preview_image_url"])
+        for im in (data.get("images") or []) + (data.get("extra_images") or []):
+            u = im.get("original_image_url") or im.get("resized_image_url")
+            if u:
+                out["images"].append(u)
+        body = data.get("body") or {}
+        if isinstance(body, dict):
+            out["body"] = out["body"] or (body.get("text") or "")
+        for c in (data.get("cards") or []):
+            if c.get("video_hd_url"):
+                out["videos_hd"].append(c["video_hd_url"])
+            if c.get("video_sd_url"):
+                out["videos_sd"].append(c["video_sd_url"])
+            u = c.get("original_image_url") or c.get("resized_image_url")
+            if u:
+                out["images"].append(u)
+            out["body"] = out["body"] or (c.get("body") or "")
+        if out["videos_hd"] or out["videos_sd"] or out["images"] or out["body"]:
+            break
+    for k in ("videos_hd", "videos_sd", "images", "preview_imgs"):
+        out[k] = list(dict.fromkeys(out[k]))
+    return out
 
 
 def download(session, url, dest, retries=2):
     if os.path.exists(dest) and os.path.getsize(dest) > 0:
         return True, "cached"
+    err = "unknown"
     for attempt in range(retries + 1):
         try:
-            with session.get(url, headers={"User-Agent": UA}, timeout=120, stream=True) as r:
+            with session.get(url, headers={"User-Agent": UA}, timeout=180, stream=True) as r:
                 r.raise_for_status()
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with open(dest, "wb") as fh:
@@ -162,12 +186,13 @@ def download(session, url, dest, retries=2):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--csv", default=DEFAULT_CSV, help="input CSV with ad_id + advertiser columns")
-    ap.add_argument("--limit", type=int, default=0, help="only process the first N ads")
-    ap.add_argument("--ids", default="", help="comma-separated ad_ids to process")
-    ap.add_argument("--sleep", type=float, default=1.5, help="delay between page fetches")
-    ap.add_argument("--no-download", action="store_true", help="extract URLs only")
-    ap.add_argument("--render", action="store_true", help="render pages with Playwright/Chromium")
+    ap.add_argument("--csv", default=DEFAULT_CSV)
+    ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--ids", default="", help="comma-separated ad_ids")
+    ap.add_argument("--sleep", type=float, default=1.5)
+    ap.add_argument("--no-download", action="store_true")
+    ap.add_argument("--max-videos", type=int, default=5, help="videos downloaded per ad (dynamic ads carry up to ~10 variants)")
+    ap.add_argument("--max-images", type=int, default=5)
     args = ap.parse_args()
 
     with open(args.csv, newline="", encoding="utf-8") as fh:
@@ -183,21 +208,13 @@ def main():
 
     session = requests.Session()
     rows = []
-    n_video = n_image = n_err = 0
+    n_video = n_image = n_none = n_err = n_body = 0
 
     for i, ad in enumerate(ads, 1):
         ad_id = ad["ad_id"]
         page_id = ad.get("page_id", "")
-        url = ad.get("ad_snapshot_url") or "https://www.facebook.com/ads/library/?id=" + ad_id
-        print("[{}/{}] {} {}".format(i, len(ads), ad.get("advertiser", ""), ad_id))
-
-        if args.render:
-            try:
-                html, err = render_html(url)
-            except Exception as exc:  # playwright missing / crashed
-                html, err = None, "render failed: {}".format(str(exc)[:200])
-        else:
-            html, err = fetch_html(session, url)
+        url = "https://www.facebook.com/ads/library/?id=" + ad_id
+        html, err = get_page(session, url)
 
         row = {
             "advertiser": ad.get("advertiser", ""),
@@ -205,8 +222,8 @@ def main():
             "ad_id": ad_id,
             "snapshot_url": url,
             "media_type": "",
-            "video_hd_url": "",
-            "video_sd_url": "",
+            "n_videos": 0,
+            "video_hd_urls": "",
             "image_urls": "",
             "body_text_scraped": "",
             "local_files": "",
@@ -217,38 +234,41 @@ def main():
             row["status"] = "FETCH_ERROR: {}".format(err)
             n_err += 1
             rows.append(row)
+            print("[{}/{}] {} {} -> FETCH_ERROR".format(i, len(ads), ad.get("advertiser", ""), ad_id))
+            time.sleep(args.sleep)
             continue
 
-        media, body = extract_media(html)
-        row["body_text_scraped"] = body
-        row["video_hd_url"] = " | ".join(media["video_hd"])
-        row["video_sd_url"] = " | ".join(media["video_sd"])
-        images = media["image_original"] or media["image_resized"]
-        row["image_urls"] = " | ".join(images)
+        media = extract_for_ad(html, ad_id)
+        row["body_text_scraped"] = media["body"]
+        if media["body"]:
+            n_body += 1
+        vids = media["videos_hd"] or media["videos_sd"]
+        row["n_videos"] = len(vids)
+        row["video_hd_urls"] = " | ".join(vids)
+        row["image_urls"] = " | ".join(media["images"])
 
-        if media["video_hd"] or media["video_sd"]:
+        if vids:
             row["media_type"] = "video"
             n_video += 1
-        elif images:
+        elif media["images"]:
             row["media_type"] = "image"
             n_image += 1
         else:
             row["media_type"] = "none_found"
-            row["status"] = "no media urls in page (JS wall? try --render)"
+            n_none += 1
 
         if not args.no_download:
             local = []
             addir = os.path.join(MEDIA_DIR, page_id, ad_id)
-            vids = media["video_hd"] or media["video_sd"]  # prefer HD, one quality tier
-            for j, vu in enumerate(vids):
+            for j, vu in enumerate(vids[: args.max_videos]):
                 dest = os.path.join(addir, "video_{}.mp4".format(j))
                 ok, note = download(session, vu, dest)
                 if ok:
                     local.append(os.path.relpath(dest, HERE))
                 else:
                     row["status"] = (row["status"] + "; " if row["status"] else "") + \
-                        "video dl failed: {}".format(note)
-            for j, iu in enumerate(images[:5]):
+                        "video {} dl failed: {}".format(j, note)
+            for j, iu in enumerate(media["images"][: args.max_images]):
                 dest = os.path.join(addir, "image_{}.jpg".format(j))
                 ok, note = download(session, iu, dest)
                 if ok:
@@ -258,6 +278,10 @@ def main():
         if not row["status"]:
             row["status"] = "ok"
         rows.append(row)
+        print("[{}/{}] {} {} -> {} ({} videos, {} images){}".format(
+            i, len(ads), ad.get("advertiser", ""), ad_id, row["media_type"],
+            len(vids), len(media["images"]),
+            " body:yes" if media["body"] else ""))
         time.sleep(args.sleep)
 
     os.makedirs(os.path.dirname(OUT_CSV), exist_ok=True)
@@ -266,15 +290,13 @@ def main():
         w.writeheader()
         w.writerows(rows)
 
-    print("-" * 56)
+    print("-" * 60)
     print("Processed {} ads -> {}".format(len(rows), OUT_CSV))
-    print("  video ads:  {}".format(n_video))
-    print("  image ads:  {}".format(n_image))
-    print("  errors:     {}".format(n_err))
-    if n_err == len(rows):
-        print("\nEvery fetch failed. If errors mention the proxy (CONNECT 403),")
-        print("www.facebook.com is still blocked by this session's network policy —")
-        print("see the header of this file for the domains to allow.")
+    print("  video ads:   {}".format(n_video))
+    print("  image ads:   {}".format(n_image))
+    print("  no media:    {}".format(n_none))
+    print("  fetch errors:{}".format(n_err))
+    print("  with body:   {}".format(n_body))
 
 
 if __name__ == "__main__":
