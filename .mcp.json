@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "facebook-ads": {
+      "command": "python3",
+      "args": ["fb-ads-scraper/facebook_ads_mcp.py"],
+      "env": {
+        "FACEBOOK_ACCESS_TOKEN": "${FACEBOOK_ACCESS_TOKEN}"
+      }
+    }
+  }
+}
