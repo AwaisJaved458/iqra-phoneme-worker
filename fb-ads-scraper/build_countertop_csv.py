@@ -80,9 +80,11 @@ def main():
     out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
     os.makedirs(out_dir, exist_ok=True)
     csv_path = os.path.join(out_dir, "countertop_ads_creative.csv")
+    full_path = os.path.join(out_dir, "countertop_ads_full.csv")
     report_path = os.path.join(out_dir, "countertop_ads_report.json")
 
-    rows = []
+    rows = []       # the 8-column task CSV
+    full_rows = []  # every field available, one row per ad
     report = []
     totals = {"ads": 0, "with_body": 0, "empty_body": 0, "with_link_title": 0}
 
@@ -111,6 +113,26 @@ def main():
                 "status": "US/empty",
             }
             rows.append(row)
+
+            full_rows.append({
+                "advertiser": name,
+                "page_id": pid,
+                "page_name": ad.get("page_name", ""),
+                "ad_id": str(ad.get("id", "")),
+                "ad_creation_time": iso(ad.get("ad_creation_time")),
+                "ad_delivery_start_time": iso(ad.get("ad_delivery_start_time")),
+                "currency": ad.get("currency", ""),
+                "reached_country": "US",
+                "body_text": body_text,                 # empty: EU-only field, 0 EU ads
+                "link_title": link_title,
+                "link_caption": "",                     # not returned by FB MCP tool
+                "link_description": "",                  # not returned by FB MCP tool
+                "publisher_platforms": "",              # not returned by FB MCP tool
+                "ad_snapshot_url": ad.get("ad_snapshot_url", ""),
+                "eu_ads_found": eu_total,
+                "status": "US/empty",
+            })
+
             totals["ads"] += 1
             totals["empty_body"] += 1
             if link_title:
@@ -135,6 +157,17 @@ def main():
         w.writeheader()
         w.writerows(rows)
 
+    full_fieldnames = [
+        "advertiser", "page_id", "page_name", "ad_id",
+        "ad_creation_time", "ad_delivery_start_time", "currency", "reached_country",
+        "body_text", "link_title", "link_caption", "link_description",
+        "publisher_platforms", "ad_snapshot_url", "eu_ads_found", "status",
+    ]
+    with open(full_path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=full_fieldnames)
+        w.writeheader()
+        w.writerows(full_rows)
+
     with open(report_path, "w", encoding="utf-8") as fh:
         json.dump({
             "source": "mcp__FB__ads_library_search (live Meta Ad Library)",
@@ -148,6 +181,7 @@ def main():
         }, fh, indent=2)
 
     print("Wrote {} ad rows -> {}".format(len(rows), csv_path))
+    print("Wrote {} ad rows (all fields) -> {}".format(len(full_rows), full_path))
     print("Report -> {}".format(report_path))
     print("-" * 56)
     for r in report:
