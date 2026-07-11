@@ -1,0 +1,8 @@
+# Core MCP dependencies
+fastmcp>=2.6.1
+requests>=2.32.3
+beautifulsoup4>=4.12.2
+
+# Optional: richer JS-rendered scraping of ad snapshot pages.
+# The server falls back to requests+beautifulsoup4 when not installed.
+# crawl4ai>=0.7.0
