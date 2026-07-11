@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+
+# Downloaded ad creatives (large binaries, reproducible via scrape_ad_videos.py).
+# The index of media URLs + local paths + body text lives in
+# output/countertop_ads_media.csv, which IS tracked.
+output/media/
