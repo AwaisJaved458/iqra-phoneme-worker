@@ -1,0 +1,23 @@
+{
+  "project": "Quran Iqra - phoneme worker",
+  "repoDir": "/Users/awaisjaved/Code/iqra-phoneme-worker",
+  "snapshotRoot": "~/Business-Snapshots/iqra-phoneme-worker",
+  "retentionDays": 60,
+  "pushTags": false,
+  "maxUntrackedMB": 100,
+  "flyApps": [],
+  "dataSources": [
+    {
+      "name": "github-export",
+      "required": true,
+      "cmd": "node \"$HOME/.claude/skills/biz-snapshot/github-export.mjs\" \"AwaisJaved458/iqra-phoneme-worker\" \"AwaisJaved458\" \"$OUT/github.json\""
+    }
+  ],
+  "extraDirs": [],
+  "mirror": {
+    "bundleRepo": true,
+    "remote": "climb-drive:Projects Backups/Quran Iqra - phoneme worker"
+  },
+  "alertCmd": "f=$(mktemp); printf '%s\\n' \"$MSG\" > \"$f\"; bash \"$HOME/.claude/scripts/hermes-push.sh\" \"$f\"; rm -f \"$f\"",
+  "notes": "Second repo of the Quran Iqra business (vault is covered by the Quran Learning App config). Likely a Cloudflare worker - deployed state not captured, code + history are."
+}
